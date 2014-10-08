@@ -1,6 +1,8 @@
 package com.kjetland.dropwizard.activemq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.apache.activemq.ActiveMQSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +15,8 @@ import javax.jms.Message;
 import javax.jms.MessageProducer;
 import javax.jms.Session;
 import javax.jms.TextMessage;
+
+import java.io.File;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -48,6 +52,17 @@ public class ActiveMQSenderImpl implements ActiveMQSender {
         }
 
     }
+    
+    @Override
+    public void send(File file) {
+        try {
+
+            internalSend(file);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error sending to jms", e);
+        }
+    }
 
     @Override
     public void sendJson(String json) {
@@ -70,6 +85,13 @@ public class ActiveMQSenderImpl implements ActiveMQSender {
         } );
     }
 
+    private void internalSend(File file) throws JMSException {
+        log.info("Sending to {}: {}", destination, file);
+        internalSend( session -> {
+            return ((ActiveMQSession)session).createBlobMessage(file);
+        } );
+    }
+    
     private void internalSend(JMSFunction<Session, Message> messageCreator) throws JMSException {
 
         // Since we're using the pooled connectionFactory,
