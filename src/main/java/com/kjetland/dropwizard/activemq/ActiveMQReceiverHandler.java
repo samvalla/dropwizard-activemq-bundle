@@ -3,13 +3,17 @@ package com.kjetland.dropwizard.activemq;
 import com.codahale.metrics.health.HealthCheck;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kjetland.dropwizard.activemq.errors.JsonError;
+
 import io.dropwizard.lifecycle.Managed;
+
 import org.apache.activemq.ActiveMQMessageConsumer;
 import org.apache.activemq.jms.pool.PooledMessageConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.jms.*;
+
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -99,31 +103,39 @@ public class ActiveMQReceiverHandler<T> implements Managed, Runnable {
         log.info("Stopped receiver for " + destination);
     }
 
-    private void processMessage(ActiveMQMessageConsumer messageConsumer, Message message) {
-        String json = null;
+    private void processMessage(ActiveMQMessageConsumer messageConsumer, Message jmsMessage) {
+        String  json    = null;
+        byte    data[]  = null;
         try {
 
-            if (message instanceof TextMessage) {
-                json = ((TextMessage) message).getText();
+            if (jmsMessage instanceof TextMessage) {
+                json = ((TextMessage) jmsMessage).getText();
+            } else if( jmsMessage instanceof BytesMessage ) {
+                BytesMessage bytesMessage = (BytesMessage) jmsMessage;
+                data = new byte[(int)bytesMessage.getBodyLength()];
+                bytesMessage.readBytes(data);
             } else {
-                throw new Exception("Do not know how to handle messages of type " + message.getClass());
+                throw new Exception("Do not know how to handle messages of type " + jmsMessage.getClass());
             }
 
             log.info("Received " + json);
 
             if ( receiverType.equals(String.class)) {
                 // pass the string as is
-                receiver.receive((T)json);
+                receiver.receive(jmsMessage, (T)json, null);
+            } else if ( jmsMessage.getJMSType() != null && jmsMessage.getJMSType().equals(File.class.getName())) {
+                // pass the Blob Message as is
+                receiver.receive(jmsMessage, null, data);
             } else {
                 T object = fromJson(json);
-                receiver.receive(object);
+                receiver.receive(jmsMessage, object, null);
             }
 
-            message.acknowledge();
+            jmsMessage.acknowledge();
         } catch (Exception e) {
-            if (exceptionHandler.onException(message, json, e)) {
+            if (exceptionHandler.onException(jmsMessage, json, e)) {
                 try {
-                    message.acknowledge();
+                    jmsMessage.acknowledge();
                 } catch (JMSException x) {
                     throw new RuntimeException(x);
                 }

@@ -1,11 +1,10 @@
 package com.kjetland.dropwizard.activemq;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.activemq.ActiveMQSession;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import javax.jms.BytesMessage;
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.DeliveryMode;
@@ -16,9 +15,10 @@ import javax.jms.MessageProducer;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 
-import java.io.File;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ActiveMQSenderImpl implements ActiveMQSender {
 
@@ -54,11 +54,9 @@ public class ActiveMQSenderImpl implements ActiveMQSender {
     }
     
     @Override
-    public void send(File file) {
+    public void send(byte[] object, Map<String, String> properties) {
         try {
-
-            internalSend(file);
-
+            internalSend(object, properties);
         } catch (Exception e) {
             throw new RuntimeException("Error sending to jms", e);
         }
@@ -67,9 +65,7 @@ public class ActiveMQSenderImpl implements ActiveMQSender {
     @Override
     public void sendJson(String json) {
         try {
-
             internalSend(json);
-
         } catch (Exception e) {
             throw new RuntimeException("Error sending to jms", e);
         }
@@ -85,13 +81,25 @@ public class ActiveMQSenderImpl implements ActiveMQSender {
         } );
     }
 
-    private void internalSend(File file) throws JMSException {
-        log.info("Sending to {}: {}", destination, file);
+    private void internalSend(byte[] bytes, Map<String, String> properties) throws JMSException {
+        log.info("Sending to {}: {}", destination, bytes);
         internalSend( session -> {
-            return ((ActiveMQSession)session).createBlobMessage(file);
+            BytesMessage bytesMessage = session.createBytesMessage();
+            bytesMessage.writeBytes(bytes);
+            if( properties != null && !properties.isEmpty() ) {
+                properties.forEach((k, v) -> {
+                    try {
+                        bytesMessage.setStringProperty(k,  v);
+                    } catch( JMSException e ) {
+                        throw new RuntimeException("Error set properties string to bytesMessage", e);
+                    }
+                });
+                
+            }
+            return bytesMessage;
         } );
     }
-    
+
     private void internalSend(JMSFunction<Session, Message> messageCreator) throws JMSException {
 
         // Since we're using the pooled connectionFactory,

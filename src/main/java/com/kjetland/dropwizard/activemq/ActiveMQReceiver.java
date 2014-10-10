@@ -1,6 +1,7 @@
 package com.kjetland.dropwizard.activemq;
 
-public interface ActiveMQReceiver<T> {
+import javax.jms.Message;
 
-    public void receive(T message);
+public interface ActiveMQReceiver<T> {
+    public void receive(Message jmsMessage, T content, byte[] file);
 }

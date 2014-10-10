@@ -1,6 +1,7 @@
 package com.kjetland.dropwizard.activemq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.activemq.broker.BrokerService;
 import org.apache.activemq.jms.pool.PooledConnectionFactory;
@@ -10,7 +11,10 @@ import org.junit.Test;
 
 import java.util.Optional;
 
+import javax.jms.Message;
+
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
 
 public class ActiveMQReceiverHandlerReliveryTest {
 
@@ -42,14 +46,13 @@ public class ActiveMQReceiverHandlerReliveryTest {
     int errorCount;
     int okCount;
 
-    private void receiveMessage(String message) {
-
-        if ( message.equals("fail")) {
+    private void receiveMessage(Message message, String content, byte[] files) {
+        if ( content.equals("fail")) {
             errorCount++;
             throw new RuntimeException("Error in receiveMessage");
         } else {
             okCount++;
-            System.out.println("receiveMessage: " + message);
+            System.out.println("receiveMessage: " + content);
         }
     }
 
@@ -72,13 +75,13 @@ public class ActiveMQReceiverHandlerReliveryTest {
         ActiveMQConnectionFactory realConnectionFactory = new ActiveMQConnectionFactory(url);
         PooledConnectionFactory connectionFactory = new PooledConnectionFactory();
         connectionFactory.setConnectionFactory(realConnectionFactory);
-
+        Message message = mock(Message.class);
         ObjectMapper objectMapper = new ObjectMapper();
-
+        
         ActiveMQReceiverHandler<String> h = new ActiveMQReceiverHandler<>(
                 destinationName,
                 connectionFactory,
-                (m)->receiveMessage(m),
+                (m,c,f)->receiveMessage(m, c,f),
                 String.class,
                 objectMapper,
                 (m,e) -> exceptionHandler(m,e),

@@ -1,6 +1,7 @@
 package com.kjetland.dropwizard.activemq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.activemq.ActiveMQMessageConsumer;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.junit.Before;
@@ -14,6 +15,7 @@ import org.mockito.verification.VerificationMode;
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.Destination;
+import javax.jms.Message;
 import javax.jms.MessageConsumer;
 import javax.jms.Queue;
 import javax.jms.Session;
@@ -88,12 +90,19 @@ public class ActiveMQReceiverHandlerTest {
         receivedExceptions.clear();
     }
 
-    private void receiveMessage(String m) {
+    private void receiveMessage(Message message, String m, byte[] file) {
         if (THROW_EXCEPTION_IN_RECEIVER.equals(m)) {
             throw new RuntimeException(THROW_EXCEPTION_IN_RECEIVER);
         }
         receivedMessages.add(m);
     }
+    
+    /*private void receiveMessage(Message message, String m) {
+        if (THROW_EXCEPTION_IN_RECEIVER.equals(m)) {
+            throw new RuntimeException(THROW_EXCEPTION_IN_RECEIVER);
+        }
+        receivedMessages.add(m);
+    }*/
 
     private TextMessage popMessage() throws Exception {
 
@@ -130,10 +139,13 @@ public class ActiveMQReceiverHandlerTest {
     @Test
     public void testNormal() throws Exception {
         setUpMocks(Arrays.asList(null, "a", "b", null, "d"));
+        Message message = mock(Message.class);
+        byte[]  file    = null;
+        
         ActiveMQReceiverHandler<String> h = new ActiveMQReceiverHandler<>(
                 destinationName,
                 connectionFactory,
-                (m)->receiveMessage((String)m),
+                (m,c,f)->receiveMessage(m, c,f),
                 String.class,
                 objectMapper,
                 (m,e) -> exceptionHandler(m,e),
@@ -155,10 +167,11 @@ public class ActiveMQReceiverHandlerTest {
     @Test
     public void testExceptionInReceiver() throws Exception {
         setUpMocks(Arrays.asList(null, "a", THROW_EXCEPTION_IN_RECEIVER, "b", null, "d"));
+        Message message = mock(Message.class);
         ActiveMQReceiverHandler<String> h = new ActiveMQReceiverHandler<>(
                 destinationName,
                 connectionFactory,
-                (m)->receiveMessage((String)m),
+                (m,c,f)->receiveMessage(m, c,f),
                 String.class,
                 objectMapper,
                 (m,e) -> exceptionHandler(m,e),
@@ -179,12 +192,12 @@ public class ActiveMQReceiverHandlerTest {
 
     @Test
     public void testExceptionInMessageConsumer() throws Exception {
-
         setUpMocks(Arrays.asList(null, "a", THROW_EXCEPTION_IN_CONSUMER, "b", null, "d"));
+        Message message = mock(Message.class);
         ActiveMQReceiverHandler<String> h = new ActiveMQReceiverHandler<>(
                 destinationName,
                 connectionFactory,
-                (m)->receiveMessage(m),
+                (m,c,f)->receiveMessage(m, c,f),
                 String.class,
                 objectMapper,
                 (m,e) -> exceptionHandler(m,e),
@@ -205,13 +218,14 @@ public class ActiveMQReceiverHandlerTest {
 
     @Test
     public void testExceptionInMessageConsumer_ConsumerIsClosed() throws Exception {
-
+        Message message = mock(Message.class);
+        
         setUpMocks(Arrays.asList(null, "a", THROW_EXCEPTION_IN_CONSUMER_CLOSED, "b", null, "d",
                 THROW_EXCEPTION_IN_CONSUMER_CLOSED, THROW_EXCEPTION_IN_CONSUMER_CLOSED));
         ActiveMQReceiverHandler<String> h = new ActiveMQReceiverHandler<>(
                 destinationName,
                 connectionFactory,
-                (m)->receiveMessage(m),
+                (m,c,f)->receiveMessage(m, c,f),
                 String.class,
                 objectMapper,
                 (m,e) -> exceptionHandler(m, e),
