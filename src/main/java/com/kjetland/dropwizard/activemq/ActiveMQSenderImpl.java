@@ -94,7 +94,6 @@ public class ActiveMQSenderImpl implements ActiveMQSender {
                         throw new RuntimeException("Error set properties string to bytesMessage", e);
                     }
                 });
-                
             }
             return bytesMessage;
         } );
