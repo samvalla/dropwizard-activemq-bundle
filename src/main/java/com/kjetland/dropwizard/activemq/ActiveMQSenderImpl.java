@@ -1,5 +1,6 @@
 package com.kjetland.dropwizard.activemq;
 
+import java.io.File;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -82,9 +83,10 @@ public class ActiveMQSenderImpl implements ActiveMQSender {
     }
 
     private void internalSend(byte[] bytes, Map<String, String> properties) throws JMSException {
-        log.info("Sending to {}: {}", destination, bytes);
+        log.info("Sending bytes to {}", destination);
         internalSend( session -> {
             BytesMessage bytesMessage = session.createBytesMessage();
+            bytesMessage.setJMSType(File.class.getName());
             bytesMessage.writeBytes(bytes);
             if( properties != null && !properties.isEmpty() ) {
                 properties.forEach((k, v) -> {
